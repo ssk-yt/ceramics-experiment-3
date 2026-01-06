@@ -262,7 +262,7 @@ ax2.vlines(
     ref_df["2Theta(deg)"],
     0,
     ref_df["I(f)"],
-    colors="blue",
+    colors="black",
     linewidth=1.2,
     label="BaTiO3 (Tetragonal)",
 )
