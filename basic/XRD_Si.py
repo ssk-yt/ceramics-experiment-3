@@ -3,6 +3,35 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 
+
+# 0. ラベルの重なり回避を関数化
+def get_unique_labels(label_list, threshold=0.6):
+    if not label_list:
+        return []
+
+    # x座標でソート
+    label_list.sort(key=lambda k: k["x"])
+
+    unique_labels = []
+    curr = label_list[0].copy()
+
+    for next_l in label_list[1:]:
+        # しきい値より近い場合は統合
+        if abs(next_l["x"] - curr["x"]) < threshold:
+            if next_l["label"] not in curr["label"]:
+                curr["label"] += f"\n{next_l['label']}"
+            # 高い方のY座標を採用する
+            if next_l["y"] > curr["y"]:
+                curr["x"] = next_l["x"]
+                curr["y"] = next_l["y"]
+        else:
+            unique_labels.append(curr)
+            curr = next_l.copy()
+
+    unique_labels.append(curr)
+    return unique_labels
+
+
 # 1. 実験データの読み込み
 # filename = 'C:\\Users\\kurot\\LaTeX\\20254Q\\gtICDDデータ類-20260105\\7-1_本焼.txt'
 sample_name = "7-1_本焼"
@@ -131,7 +160,9 @@ if len(roi_peaks) >= 2:
 # 4. 指数付け (BaTiO3 Reference CSV使用)
 # ref_df = pd.read_csv('C:\\Users\\kurot\\LaTeX\\20254Q\\gtICDDデータ類-20260105\\1_BaTiO3-tetragonal.csv')
 ref_df = pd.read_csv("basic/data/gtICDDデータ類-20260106/1_BaTiO3-tetragonal.csv")
-labels = []
+
+# BaTiO3ラベルを追加
+bt_labels = []
 # 強度が低いピークは除外
 ref_strong = ref_df[ref_df["I(f)"] >= 5]  # 強度閾値5以上のピークのみ使用
 
@@ -159,39 +190,43 @@ for _, row in ref_strong.iterrows():
             real_th = df.loc[best_idx, "2theta_corr"]
             inten = df.loc[best_idx, "Intensity"]
 
-            labels.append(
+            bt_labels.append(
                 {"label": f"({h}{k}{l})", "x": real_th, "y": inten, "color": "blue"}
             )
 
-# ラベルの重なり処理
-labels.sort(key=lambda k: k["x"])
-unique_labels = []
-if labels:
-    curr = labels[0]
-    for next_l in labels[1:]:
-        if abs(next_l["x"] - curr["x"]) < 0.3:
-            if next_l["label"] not in curr["label"]:
-                curr["label"] += f"\n{next_l['label']}"
-            if next_l["y"] > curr["y"]:
-                curr["x"] = next_l["x"]
-                curr["y"] = next_l["y"]
-                # 色はcurrを引き継ぎます
-        else:
-            unique_labels.append(curr)
-            curr = next_l
-    unique_labels.append(curr)
-
 # Siラベルを追加
+si_labels = []
 for p in correction_points:
     search_th = p["theo"]
-    window = df[
-        (df["2theta_corr"] >= search_th - 0.3) & (df["2theta_corr"] <= search_th + 0.3)
-    ]
-    if not window.empty:
-        y_pos = window["Intensity"].max()
-        unique_labels.append(
-            {"label": p["hkl"], "x": search_th, "y": y_pos, "color": "red"}
+    if search_th <= 90:  # 90°以下のラベルのみ
+        window = df[
+            (df["2theta_corr"] >= search_th - 0.3)
+            & (df["2theta_corr"] <= search_th + 0.3)
+        ]
+        if not window.empty:
+            y_pos = window["Intensity"].max()
+            si_labels.append(
+                {"label": p["hkl"], "x": search_th, "y": y_pos, "color": "red"}
+            )
+
+# ICDDデータのラベル
+ax2_labels = []
+for _, row in ref_df.iterrows():
+    if row["I(f)"] >= 5 and row["2Theta(deg)"] <= 90:  # 強度5以上かつ90°以下
+        ax2_labels.append(
+            {
+                "label": f"({int(row['h'])}{int(row['k'])}{int(row['l'])})",
+                "x": row["2Theta(deg)"],
+                "y": row["I(f)"],
+                "color": "blue",
+            }
         )
+
+# ラベルの重なり処理
+unique_labels_ax1 = get_unique_labels(bt_labels) + get_unique_labels(
+    si_labels
+)  # BaTiO3とSiのラベルをそれぞれ処理して、一つのリストに格納
+unique_labels_ax2 = get_unique_labels(ax2_labels)
 
 # 5. プロット
 fig, (ax1, ax2) = plt.subplots(
@@ -201,8 +236,8 @@ fig, (ax1, ax2) = plt.subplots(
 # ax1への描画
 ax1.plot(df["2theta_corr"], df["Intensity"], "k-", linewidth=0.8, label="Corrected XRD")
 
-# ラベルの描画
-for l in unique_labels:
+# ax1のラベルの描画
+for l in unique_labels_ax1:
     ax1.text(
         l["x"],
         l["y"] + 500,
@@ -233,22 +268,21 @@ ax2.vlines(
 )
 
 # 各スティックの上に指数のラベルを表示
-for _, row in ref_df.iterrows():
-    if row["I(f)"] >= 10:  # 強度10以上のピークにラベルを表示
-        ax2.text(
-            row["2Theta(deg)"],
-            row["I(f)"] + 5,  # スティックの少し上に配置
-            f"({int(row['h'])}{int(row['k'])}{int(row['l'])})",
-            rotation=90,
-            ha="center",
-            va="bottom",
-            fontsize=7,
-            color="blue",
-        )
+for l in unique_labels_ax2:
+    ax2.text(
+        l["x"],
+        l["y"] + 5,
+        l["label"],
+        rotation=90,
+        ha="center",
+        va="bottom",
+        fontsize=7,
+        color=l["color"],
+    )
 
 # ax2 の書式設定
 ax2.set_ylabel("Rel. Int. (ICDD)")
-ax2.set_ylim(0, 160)  # ラベルが見切れないように高さを調整
+ax2.set_ylim(0, 180)  # ラベルが見切れないように高さを調整
 ax2.legend(loc="upper right")
 ax2.grid(
     axis="x", linestyle="--", alpha=0.5
