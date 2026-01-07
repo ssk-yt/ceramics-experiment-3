@@ -34,7 +34,7 @@ def get_unique_labels(label_list, threshold=0.6):
 
 # 1. 実験データの読み込み
 # filename = 'C:\\Users\\kurot\\LaTeX\\20254Q\\gtICDDデータ類-20260105\\7-1_本焼.txt'
-sample_name = "7-1_本焼"
+sample_name = "7-1_仮焼"
 filename = f"basic/data/gtICDDデータ類-20260106/{sample_name}.txt"
 data = []
 # ファイルが存在しない場合のエラーハンドリングを追加する場合、try-exceptブロックを使用しますが、
@@ -160,6 +160,7 @@ if len(roi_peaks) >= 2:
 # 4. 指数付け (BaTiO3 Reference CSV使用)
 # ref_df = pd.read_csv('C:\\Users\\kurot\\LaTeX\\20254Q\\gtICDDデータ類-20260105\\1_BaTiO3-tetragonal.csv')
 ref_df = pd.read_csv("basic/data/gtICDDデータ類-20260106/1_BaTiO3-tetragonal.csv")
+# ref_df = pd.read_csv("basic/data/gtICDDデータ類-20260106/2_BaTiO3-hexagonal.csv")
 
 # BaTiO3ラベルを追加
 bt_labels = []
@@ -226,6 +227,9 @@ for _, row in ref_df.iterrows():
 unique_labels_ax1 = get_unique_labels(bt_labels) + get_unique_labels(
     si_labels
 )  # BaTiO3とSiのラベルをそれぞれ処理して、一つのリストに格納
+# unique_labels_ax1 = get_unique_labels(
+#     bt_labels
+# )  # BaTiO3とSiのラベルをそれぞれ処理して、一つのリストに格納
 unique_labels_ax2 = get_unique_labels(ax2_labels)
 
 # 5. プロット
